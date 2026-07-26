@@ -8,4 +8,5 @@ type Config struct {
 	ParseMP3 bool
 	Verbose bool
 	Debug bool
+	NoSkip bool
 }

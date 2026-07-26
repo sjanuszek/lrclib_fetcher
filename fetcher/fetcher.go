@@ -253,7 +253,7 @@ func fetchLyrics(tasks []NecessaryData, stats *Statistics, lyricJobs int, maxRet
 	return cache
 }
 
-func getTasks(files []string, stats *Statistics, jobs int, logger *Logger) []NecessaryData { 
+func getTasks(files []string, stats *Statistics, jobs int, noSkip bool, logger *Logger) []NecessaryData { 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
@@ -271,7 +271,7 @@ func getTasks(files []string, stats *Statistics, jobs int, logger *Logger) []Nec
 				curr := counter.Add(1)
 				stats.filesCounter.Add(1)
 
-				if hasLrcFile(file_name) {
+				if !noSkip && hasLrcFile(file_name) {
 					logger.verbose("[%0*d/%0*d] Skipping: %s", width, curr, width, total, file_name)
 					stats.skippedCounter.Add(1)
 					continue
@@ -379,7 +379,7 @@ func GetLyrics(config arguments.Config) Statistics {
 		isDebug: config.Debug,
 	}
 
-	tasks := getTasks(files, &stats, jobs, &logger)
+	tasks := getTasks(files, &stats, jobs, config.NoSkip, &logger)
 
 	lyrics := fetchLyrics(tasks, &stats, fetchJobs, maxRetries, &logger)
 
