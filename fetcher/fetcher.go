@@ -2,6 +2,7 @@ package fetcher
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -40,11 +41,87 @@ func (lc *LyricsCache) addToCache(filePath string, data string) {
 	lc.cache = append(lc.cache, LyricTuple{filePath, data})
 }
 
+type FormattingData struct {
+	width, total int
+	curr int64
+	trackName string
+}
+
 type Fetcher struct {
+	client http.Client
 	stats Statistics
 	lyricJobs int
 	maxRetries int
 	logger util.Logger
+}
+
+func (fetcher *Fetcher) tryGet(params url.Values, formattingData FormattingData) (GetResponse, error) {
+	var data GetResponse
+	var fetched, notFound bool
+
+	for attempt := range fetcher.maxRetries - 1 {
+		requestGet := APIBase + "get?" + params.Encode()
+		fetcher.logger.Debug("%s", requestGet)
+
+		req, err := http.NewRequest("GET", requestGet, nil)
+		if err != nil {
+			fmt.Println(err)
+			return GetResponse{}, err
+		}
+
+		req.Header.Set("User-Agent", "MyLrcFetcher/1.0")
+
+		respGet, err := fetcher.client.Do(req)
+		if err != nil {
+			if attempt < fetcher.maxRetries {
+				time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
+				continue
+			}
+			fetcher.logger.Always("[%0*d/%0*d] Network error after retries: %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName)
+			return GetResponse{}, err
+		}
+		
+		func ()  {
+			defer respGet.Body.Close()
+
+			if respGet.StatusCode == http.StatusTooManyRequests || respGet.StatusCode >= 500 {
+				if attempt < fetcher.maxRetries - 1 {
+					time.Sleep(time.Duration(attempt) * 1 * time.Second)
+					return
+				}
+				fetcher.logger.Always("[%0*d/%0*d] HTTP %d (Rate limited / Server error): %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, respGet.StatusCode, formattingData.trackName)
+				return
+			}
+
+			if respGet.StatusCode == http.StatusNotFound {
+				fetcher.logger.Always("[%0*d/%0*d] Not found (404): %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName)
+				fetcher.stats.notFoundCounter.Add(1)
+				notFound = true
+				return
+			}
+
+			if respGet.StatusCode != http.StatusOK {
+				fetcher.logger.Always("[%0*d/%0*d] HTTP %d: %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, respGet.StatusCode, formattingData.trackName)
+				return
+			}
+
+			if err := json.NewDecoder(respGet.Body).Decode(&data); err != nil {
+				fetcher.logger.Always("[%0*d/%0*d] JSON parse error for %s: %v", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName, err)
+				return
+			}
+
+			fetched = true
+
+		}()
+
+		if fetched {
+			return data, nil
+		} else if notFound {
+			return GetResponse{}, errors.New("NOTHING FOUND 404")
+		}
+	}
+
+	return GetResponse{}, errors.New("NOTHING FOUND WITH GET")
 }
 
 func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) LyricsCache {
@@ -59,8 +136,6 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) LyricsCache 
 
 	var counter atomic.Int64
 
-	client := &http.Client{Timeout: 12 * time.Second}
-
 	for range fetcher.lyricJobs {
 		wg.Go(func() {
 			for task := range taskCh {
@@ -72,81 +147,28 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) LyricsCache 
 				params.Add("album_name", task.AlbumName)
 				params.Add("duration", task.Duration)
 
-				requestGet := APIBase + "get?" + params.Encode()
+				formattingData := FormattingData{
+					width,
+					total,
+					curr,
+					task.TrackName,
+				}
 
-				fetcher.logger.Debug("%s", requestGet)
-				var syncedLyrics, plainLyrics string
-				var fetched, notFound bool
+				respGet, err := fetcher.tryGet(params, formattingData)
 
-				for attempt := range fetcher.maxRetries - 1 {
-					req, err := http.NewRequest("GET", requestGet, nil)
-					if err != nil {
-						fmt.Println(err)
-						continue
-					}
-
-					req.Header.Set("User-Agent", "MyLrcFetcher/1.0")
-
-					respGet, err := client.Do(req)
-					if err != nil {
-						if attempt < fetcher.maxRetries {
-							time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
-							continue
-						}
-						fetcher.logger.Always("[%0*d/%0*d] Network error after retries: %s", width, curr, width, total, task.TrackName)
-						break
-					}
-
-					func ()  {
-						defer respGet.Body.Close()
-
-						if respGet.StatusCode == http.StatusTooManyRequests || respGet.StatusCode >= 500 {
-							if attempt < fetcher.maxRetries - 1 {
-								time.Sleep(time.Duration(attempt) * 1 * time.Second)
-								return
-							}
-							fetcher.logger.Always("[%0*d/%0*d] HTTP %d (Rate limited / Server error): %s", width, curr, width, total, respGet.StatusCode, task.TrackName)
-							return
-						}
-
-						if respGet.StatusCode == http.StatusNotFound {
-							fetcher.logger.Always("[%0*d/%0*d] Not found (404): %s \n Trying search", width, curr, width, total, task.TrackName)
-							fetcher.stats.notFoundCounter.Add(1)
-							notFound = true 
-							return
-						}
-
-						if respGet.StatusCode != http.StatusOK {
-							fetcher.logger.Always("[%0*d/%0*d] HTTP %d: %s", width, curr, width, total, respGet.StatusCode, task.TrackName)
-							return
-						}
-
-						var data GetResponse
-						if err := json.NewDecoder(respGet.Body).Decode(&data); err != nil {
-							fetcher.logger.Always("[%0*d/%0*d] JSON parse error for %s: %v", width, curr, width, total, task.TrackName, err)
-							return
-						}
-
-						syncedLyrics = data.SyncedLyrics
-						plainLyrics = data.PlainLyrics
-						fetched = true
-
-					}()
-
-					if fetched || notFound {
-						break
-					}
+				if err != nil {
+					fetcher.logger.Always("[%0*d/%0*d] Failed to fetch lyrics using get: %s", width, curr, width, total, task.TrackName)
 				}
 				
-				if syncedLyrics != "" {
+				if respGet.SyncedLyrics != "" {
 					fetcher.logger.Verbose("[%0*d/%0*d] Fetched synced lyrics: %s", width, curr, width, total, task.TrackName)
 					fetcher.stats.syncedCounter.Add(1)
-					cache.addToCache(task.FilePath, syncedLyrics)
-				} else if plainLyrics != "" {
+					cache.addToCache(task.FilePath, respGet.SyncedLyrics)
+				} else if respGet.PlainLyrics != "" {
 					fetcher.logger.Verbose("[%0*d/%0*d] Fetched plain lyrics: %s", width, curr, width, total, task.TrackName)
 					fetcher.stats.plainCounter.Add(1)
-					cache.addToCache(task.FilePath, plainLyrics)
-				} else if fetched {
+					cache.addToCache(task.FilePath, respGet.PlainLyrics)
+				} else {
 					fetcher.logger.Always("[%0*d/%0*d] Track found but contains no lyrics: %s", width, curr, width, total, task.TrackName)
 					fetcher.stats.failedCounter.Add(1)
 				}
@@ -218,6 +240,7 @@ func GetLyrics(config arguments.Config) Statistics {
 	}
 
 	var stats Statistics
+	client := &http.Client{Timeout: 12 * time.Second}
 	jobs := min(max(config.Jobs, 0), runtime.NumCPU())
 	fetchJobs := max(config.FetchJobs, 0)
 	maxRetries := max(config.MaxRetries, 0)
@@ -227,6 +250,7 @@ func GetLyrics(config arguments.Config) Statistics {
 	}
 
 	fetcher := Fetcher{
+		*client,
 		stats,
 		fetchJobs,
 		maxRetries,
