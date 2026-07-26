@@ -43,6 +43,11 @@ type Logger struct {
 	isDebug bool
 }
 
+type GetResponse struct {
+	PlainLyrics string `json:"plainLyrics"`
+	SyncedLyrics string `json:"syncedLyrics"`
+}
+
 func (l *Logger) verbose(format string, a ...any) {
 	if !l.isVerbose {
 		return
@@ -205,14 +210,14 @@ func fetchLyrics(tasks []NecessaryData, stats *Statistics, lyricJobs int, maxRet
 							return
 						}
 
-						var data map[string]any
+						var data GetResponse
 						if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 							logger.always("[%0*d/%0*d] JSON parse error for %s: %v", width, curr, width, total, task.trackName, err)
 							return
 						}
 
-						syncedLyrics, _ = data["syncedLyrics"].(string)
-						plainLyrics, _ = data["plainLyrics"].(string)
+						syncedLyrics = data.SyncedLyrics
+						plainLyrics = data.PlainLyrics
 						fetched = true
 
 					}()
