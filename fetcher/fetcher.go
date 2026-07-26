@@ -20,6 +20,8 @@ import (
 	"github.com/dhowden/tag"
 )
 
+const apiBase = "https://lrclib.net/api/"
+
 type NecessaryData struct {
 	filePath, trackName, artistName, albumName, duration string
 }
@@ -162,13 +164,14 @@ func fetchLyrics(tasks []NecessaryData, stats *Statistics, lyricJobs int, maxRet
 				params.Add("album_name", task.albumName)
 				params.Add("duration", task.duration)
 
-				request := "https://lrclib.net/api/get?" + params.Encode()
-				logger.debug("%s", request)
+				requestGet := apiBase + "get?" + params.Encode()
+
+				logger.debug("%s", requestGet)
 				var syncedLyrics, plainLyrics string
 				var fetched, notFound bool
 
 				for attempt := range maxRetries - 1 {
-					req, err := http.NewRequest("GET", request, nil)
+					req, err := http.NewRequest("GET", requestGet, nil)
 					if err != nil {
 						fmt.Println(err)
 						continue
@@ -176,7 +179,7 @@ func fetchLyrics(tasks []NecessaryData, stats *Statistics, lyricJobs int, maxRet
 
 					req.Header.Set("User-Agent", "MyLrcFetcher/1.0")
 
-					resp, err := client.Do(req)
+					respGet, err := client.Do(req)
 					if err != nil {
 						if attempt < maxRetries {
 							time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
@@ -187,31 +190,31 @@ func fetchLyrics(tasks []NecessaryData, stats *Statistics, lyricJobs int, maxRet
 					}
 
 					func ()  {
-						defer resp.Body.Close()
+						defer respGet.Body.Close()
 
-						if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+						if respGet.StatusCode == http.StatusTooManyRequests || respGet.StatusCode >= 500 {
 							if attempt < maxRetries - 1 {
 								time.Sleep(time.Duration(attempt) * 1 * time.Second)
 								return
 							}
-							logger.always("[%0*d/%0*d] HTTP %d (Rate limited / Server error): %s", width, curr, width, total, resp.StatusCode, task.trackName)
+							logger.always("[%0*d/%0*d] HTTP %d (Rate limited / Server error): %s", width, curr, width, total, respGet.StatusCode, task.trackName)
 							return
 						}
 
-						if resp.StatusCode == http.StatusNotFound {
-							logger.always("[%0*d/%0*d] Not found (404): %s", width, curr, width, total, task.trackName)
+						if respGet.StatusCode == http.StatusNotFound {
+							logger.always("[%0*d/%0*d] Not found (404): %s \n Trying search", width, curr, width, total, task.trackName)
 							stats.notFoundCounter.Add(1)
 							notFound = true 
 							return
 						}
 
-						if resp.StatusCode != http.StatusOK {
-							logger.always("[%0*d/%0*d] HTTP %d: %s", width, curr, width, total, resp.StatusCode, task.trackName)
+						if respGet.StatusCode != http.StatusOK {
+							logger.always("[%0*d/%0*d] HTTP %d: %s", width, curr, width, total, respGet.StatusCode, task.trackName)
 							return
 						}
 
 						var data GetResponse
-						if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+						if err := json.NewDecoder(respGet.Body).Decode(&data); err != nil {
 							logger.always("[%0*d/%0*d] JSON parse error for %s: %v", width, curr, width, total, task.trackName, err)
 							return
 						}
