@@ -293,26 +293,14 @@ func createLyricFiles(lyrics *LyricsCache, jobs int, logger *util.Logger) {
 	wg.Wait()
 }
 
-func glob(dir string, ext string) ([]string, error) {
-	files := []string{}
-	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
-		if filepath.Ext(path) == ext && !strings.Contains(path, "Body 13") && !strings.Contains(path, "Bull of Heaven") {
-			files = append(files, path)
-		}
-		return nil
-	})
-
-	return files, err
-}
-
 func GetLyrics(config arguments.Config) Statistics {
-	files, err := glob(config.InputPath, ".flac")
+	files, err := util.Glob(config.InputPath, ".flac")
 	if err != nil {
 		panic("FAILED TO GLOB FLAC")
 	}
 
 	if config.ParseMP3 {
-		mp3, err := glob(config.InputPath, ".mp3")	
+		mp3, err := util.Glob(config.InputPath, ".mp3")
 		if err != nil {
 			panic("FAILED TO GLOB MP3")
 		}
