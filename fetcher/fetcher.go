@@ -21,8 +21,6 @@ import (
 	"github.com/dhowden/tag"
 )
 
-const apiBase = "https://lrclib.net/api/"
-
 type NecessaryData struct {
 	filePath, trackName, artistName, albumName, duration string
 }
@@ -36,64 +34,11 @@ type LyricsCache struct {
 	cache []LyricTuple
 }
 
-type Statistics struct {
-	filesCounter, skippedCounter, processedCounter, notFoundCounter, syncedCounter, plainCounter, failedCounter atomic.Int64
-}
-
-type Logger struct {
-	mu sync.Mutex
-	isVerbose bool
-	isDebug bool
-}
-
 type GetResponse struct {
 	PlainLyrics string `json:"plainLyrics"`
 	SyncedLyrics string `json:"syncedLyrics"`
 }
 
-func (l *Logger) verbose(format string, a ...any) {
-	if !l.isVerbose {
-		return
-	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	fmt.Printf(format + "\n", a...)
-}
-
-func (l *Logger) debug(format string, a ...any) {
-	if !l.isDebug {
-		return
-	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	fmt.Printf("[DEBUG] " + format + "\n", a...)
-}
-
-func (l *Logger) always(format string, a ...any) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	fmt.Printf(format + "\n", a...)
-}
-
-func (s *Statistics) String() string {
-	return fmt.Sprintf(
-		"\n================ Statistics ================\n"+
-		"Files Found: %d\n"+
-		"Skipped (.lrc exists): %d\n"+
-		"Metadata Processed: %d\n"+
-		"Synced Lyrics Fetched: %d\n"+
-		"Plain Lyrics Fetched: %d\n"+
-		"Not Found (404): %d\n"+
-		"Failed / No Lyrics: %d\n"+
-		"============================================",
-		s.filesCounter.Load(),
-		s.skippedCounter.Load(),
-		s.processedCounter.Load(),
-		s.syncedCounter.Load(),
-		s.plainCounter.Load(),
-		s.notFoundCounter.Load(),
-		s.failedCounter.Load(),
-	)
 }
 
 func (lc *LyricsCache) addToCache(filePath string, data string) {
@@ -165,7 +110,7 @@ func fetchLyrics(tasks []NecessaryData, stats *Statistics, lyricJobs int, maxRet
 				params.Add("album_name", task.albumName)
 				params.Add("duration", task.duration)
 
-				requestGet := apiBase + "get?" + params.Encode()
+				requestGet := APIBase + "get?" + params.Encode()
 
 				logger.Debug("%s", requestGet)
 				var syncedLyrics, plainLyrics string
