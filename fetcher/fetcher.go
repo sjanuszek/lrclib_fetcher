@@ -1,13 +1,11 @@
 package fetcher
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -16,14 +14,9 @@ import (
 	"time"
 
 	"lrclib_fetcher/arguments"
+	"lrclib_fetcher/metadata"
 	"lrclib_fetcher/util"
-
-	"github.com/dhowden/tag"
 )
-
-type NecessaryData struct {
-	filePath, trackName, artistName, albumName, duration string
-}
 
 type LyricTuple struct {
 	filePath, data string
@@ -54,43 +47,12 @@ func hasLrcFile(path string) bool {
     return err == nil
 }
 
-func getTags(file *os.File) (NecessaryData, bool) {
-	m, err := tag.ReadFrom(file)
-	if err != nil {
-		return NecessaryData{}, false
-	}
-
-	duration, err := getTrackDuration(file.Name())
-	if err != nil {
-		return NecessaryData{}, false
-	}
-
-	return NecessaryData{
-		file.Name(),
-		m.Title(),
-		m.AlbumArtist(),
-		m.Album(),
-		duration,
-	}, true
-}
-
-func getTrackDuration(fileName string) (string, error) {
-	cmd := exec.Command("ffprobe", "-i", fileName, "-show_entries", "format=duration", "-v", "quiet", "-of", "csv=p=0",)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	_ = cmd.Run()
-
-	val, _, _ := strings.Cut(strings.TrimSpace(out.String()), ".")
-
-	return val, nil
-}
-
-func fetchLyrics(tasks []NecessaryData, stats *Statistics, lyricJobs int, maxRetries int, logger *util.Logger) LyricsCache {
+func fetchLyrics(tasks []metadata.NecessaryData, stats *Statistics, lyricJobs int, maxRetries int, logger *util.Logger) LyricsCache {
 	var wg sync.WaitGroup
 	cache := LyricsCache {
 		cache: make([]LyricTuple, 0, len(tasks)),
 	}
-	taskCh := make(chan NecessaryData, len(tasks))
+	taskCh := make(chan metadata.NecessaryData, len(tasks))
 
 	total := len(tasks)
 	width := len(fmt.Sprintf("%d", total))
@@ -105,10 +67,10 @@ func fetchLyrics(tasks []NecessaryData, stats *Statistics, lyricJobs int, maxRet
 				curr := counter.Add(1)
 
 				params := url.Values{}
-				params.Add("artist_name", task.artistName)
-				params.Add("track_name", task.trackName)
-				params.Add("album_name", task.albumName)
-				params.Add("duration", task.duration)
+				params.Add("artist_name", task.ArtistName)
+				params.Add("track_name", task.TrackName)
+				params.Add("album_name", task.AlbumName)
+				params.Add("duration", task.Duration)
 
 				requestGet := APIBase + "get?" + params.Encode()
 
@@ -131,7 +93,7 @@ func fetchLyrics(tasks []NecessaryData, stats *Statistics, lyricJobs int, maxRet
 							time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
 							continue
 						}
-						logger.Always("[%0*d/%0*d] Network error after retries: %s", width, curr, width, total, task.trackName)
+						logger.Always("[%0*d/%0*d] Network error after retries: %s", width, curr, width, total, task.TrackName)
 						break
 					}
 
@@ -143,25 +105,25 @@ func fetchLyrics(tasks []NecessaryData, stats *Statistics, lyricJobs int, maxRet
 								time.Sleep(time.Duration(attempt) * 1 * time.Second)
 								return
 							}
-							logger.Always("[%0*d/%0*d] HTTP %d (Rate limited / Server error): %s", width, curr, width, total, respGet.StatusCode, task.trackName)
+							logger.Always("[%0*d/%0*d] HTTP %d (Rate limited / Server error): %s", width, curr, width, total, respGet.StatusCode, task.TrackName)
 							return
 						}
 
 						if respGet.StatusCode == http.StatusNotFound {
-							logger.Always("[%0*d/%0*d] Not found (404): %s \n Trying search", width, curr, width, total, task.trackName)
+							logger.Always("[%0*d/%0*d] Not found (404): %s \n Trying search", width, curr, width, total, task.TrackName)
 							stats.notFoundCounter.Add(1)
 							notFound = true 
 							return
 						}
 
 						if respGet.StatusCode != http.StatusOK {
-							logger.Always("[%0*d/%0*d] HTTP %d: %s", width, curr, width, total, respGet.StatusCode, task.trackName)
+							logger.Always("[%0*d/%0*d] HTTP %d: %s", width, curr, width, total, respGet.StatusCode, task.TrackName)
 							return
 						}
 
 						var data GetResponse
 						if err := json.NewDecoder(respGet.Body).Decode(&data); err != nil {
-							logger.Always("[%0*d/%0*d] JSON parse error for %s: %v", width, curr, width, total, task.trackName, err)
+							logger.Always("[%0*d/%0*d] JSON parse error for %s: %v", width, curr, width, total, task.TrackName, err)
 							return
 						}
 
@@ -177,15 +139,15 @@ func fetchLyrics(tasks []NecessaryData, stats *Statistics, lyricJobs int, maxRet
 				}
 				
 				if syncedLyrics != "" {
-					logger.Verbose("[%0*d/%0*d] Fetched synced lyrics: %s", width, curr, width, total, task.trackName)
+					logger.Verbose("[%0*d/%0*d] Fetched synced lyrics: %s", width, curr, width, total, task.TrackName)
 					stats.syncedCounter.Add(1)
-					cache.addToCache(task.filePath, syncedLyrics)
+					cache.addToCache(task.FilePath, syncedLyrics)
 				} else if plainLyrics != "" {
-					logger.Verbose("[%0*d/%0*d] Fetched plain lyrics: %s", width, curr, width, total, task.trackName)
+					logger.Verbose("[%0*d/%0*d] Fetched plain lyrics: %s", width, curr, width, total, task.TrackName)
 					stats.plainCounter.Add(1)
-					cache.addToCache(task.filePath, plainLyrics)
+					cache.addToCache(task.FilePath, plainLyrics)
 				} else if fetched {
-					logger.Always("[%0*d/%0*d] Track found but contains no lyrics: %s", width, curr, width, total, task.trackName)
+					logger.Always("[%0*d/%0*d] Track found but contains no lyrics: %s", width, curr, width, total, task.TrackName)
 					stats.failedCounter.Add(1)
 				}
 			}
@@ -202,11 +164,11 @@ func fetchLyrics(tasks []NecessaryData, stats *Statistics, lyricJobs int, maxRet
 	return cache
 }
 
-func getTasks(files []string, stats *Statistics, jobs int, noSkip bool, logger *util.Logger) []NecessaryData { 
+func getTasks(files []string, stats *Statistics, jobs int, noSkip bool, logger *util.Logger) []metadata.NecessaryData {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
-	tasks := make([]NecessaryData, 0, len(files))
+	tasks := make([]metadata.NecessaryData, 0, len(files))
 	filesCh := make(chan string, len(files))
 
 	total := len(files)
@@ -232,7 +194,7 @@ func getTasks(files []string, stats *Statistics, jobs int, noSkip bool, logger *
 					continue
 				}
 
-				if m, ok := getTags(file); ok {
+				if m, ok := metadata.GetTags(file); ok {
 					logger.Verbose("[%0*d/%0*d] Getting metadata: %s", width, curr, width, total, file_name)
 					stats.processedCounter.Add(1)
 					mu.Lock()
