@@ -33,6 +33,14 @@ type GetResponse struct {
 	SyncedLyrics string `json:"syncedLyrics"`
 }
 
+type SearchResponse struct {
+	TrackName string `json:"trackName"`
+	ArtistName string `json:"artistName"`
+	AlbumName string `json:"albumName"`
+	Duration float32 `json:"duration"`
+	Instrumental bool `json:"instrumental"`
+	PlainLyrics string `json:"plainLyrics"`
+	SyncedLyrics string `json:"syncedLyrics"`
 }
 
 func (lc *LyricsCache) addToCache(filePath string, data string) {
@@ -116,6 +124,8 @@ func (fetcher *Fetcher) tryGet(params url.Values, formattingData FormattingData)
 	return doAPIRequest[GetResponse](fetcher, "get", params, formattingData)
 }
 
+func (fetcher *Fetcher) trySearch(params url.Values, formattingData FormattingData) ([]SearchResponse, error) {
+	return doAPIRequest[[]SearchResponse](fetcher, "search", params, formattingData)
 }
 
 func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) LyricsCache {
