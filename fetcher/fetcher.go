@@ -2,7 +2,6 @@ package fetcher
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -67,6 +66,7 @@ func doAPIRequest[T any](fetcher *Fetcher, endpoint string, params url.Values, f
 	var data T
 
 	requestURL:= APIBase + endpoint + "?" + params.Encode()
+	endpointFormatting := strings.ToUpper(endpoint)
 	for attempt := range fetcher.maxRetries - 1 {
 		fetcher.logger.Debug("%s", requestURL)
 
@@ -83,7 +83,7 @@ func doAPIRequest[T any](fetcher *Fetcher, endpoint string, params url.Values, f
 				time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
 				continue
 			}
-			fetcher.logger.Always("[%0*d/%0*d] Network error after retries: %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName)
+			fetcher.logger.Always("[%s][%0*d/%0*d] Network error after retries: %s", endpointFormatting, formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName)
 			return data, err
 		}
 		
@@ -93,31 +93,31 @@ func doAPIRequest[T any](fetcher *Fetcher, endpoint string, params url.Values, f
 				time.Sleep(time.Duration(attempt) * 1 * time.Second)
 				continue
 			}
-			fetcher.logger.Always("[%0*d/%0*d] HTTP %d (Rate limited / Server error): %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, resp.StatusCode, formattingData.trackName)
-			return data, fmt.Errorf("HTTP %d", resp.StatusCode)
+			fetcher.logger.Always("[%s][%0*d/%0*d] HTTP %d (Rate limited / Server error): %s", endpointFormatting, formattingData.width, formattingData.curr, formattingData.width, formattingData.total, resp.StatusCode, formattingData.trackName)
+			return data, fmt.Errorf("[%s] HTTP %d", endpointFormatting, resp.StatusCode)
 		}
 
 		if resp.StatusCode == http.StatusNotFound {
 			resp.Body.Close()
-			fetcher.logger.Always("[%0*d/%0*d] Not found (404): %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName)
+			fetcher.logger.Always("[%s][%0*d/%0*d] Not found (404): %s", endpointFormatting, formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName)
 			fetcher.stats.notFoundCounter.Add(1)
-			return data, errors.New("NOTHING FOUND 404")
+			return data, fmt.Errorf("[%s] NOTHING FOUND 404", endpointFormatting)
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			fetcher.logger.Always("[%0*d/%0*d] HTTP %d: %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, resp.StatusCode, formattingData.trackName)
-			return data, fmt.Errorf("HTTP %d", resp.StatusCode)
+			fetcher.logger.Always("[%s][%0*d/%0*d] HTTP %d: %s", endpointFormatting, formattingData.width, formattingData.curr, formattingData.width, formattingData.total, resp.StatusCode, formattingData.trackName)
+			return data, fmt.Errorf("[%s] HTTP %d", endpointFormatting, resp.StatusCode)
 		}
 
 		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-			fetcher.logger.Always("[%0*d/%0*d] JSON parse error for %s: %v", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName, err)
+			fetcher.logger.Always("[%s][%0*d/%0*d] JSON parse error for %s: %v", endpointFormatting, formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName, err)
 			return data, err
 		}
 
 		return data, nil
 	}
 
-	return data, errors.New("NOTHING FOUND WITH GET")
+	return data, fmt.Errorf("NOTHING FOUND WITH %s", endpointFormatting)
 }
 
 func (fetcher *Fetcher) tryGet(params url.Values, formattingData FormattingData) (GetResponse, error) {
