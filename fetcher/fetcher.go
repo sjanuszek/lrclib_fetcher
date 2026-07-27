@@ -55,73 +55,67 @@ type Fetcher struct {
 	logger util.Logger
 }
 
-func (fetcher *Fetcher) tryGet(params url.Values, formattingData FormattingData) (GetResponse, error) {
-	var data GetResponse
-	var fetched, notFound bool
+func doAPIRequest[T any](fetcher *Fetcher, endpoint string, params url.Values, formattingData FormattingData) (T, error) {
+	var data T
 
+	requestURL:= APIBase + endpoint + "?" + params.Encode()
 	for attempt := range fetcher.maxRetries - 1 {
-		requestGet := APIBase + "get?" + params.Encode()
-		fetcher.logger.Debug("%s", requestGet)
+		fetcher.logger.Debug("%s", requestURL)
 
-		req, err := http.NewRequest("GET", requestGet, nil)
+		req, err := http.NewRequest("GET", requestURL, nil)
 		if err != nil {
-			fmt.Println(err)
-			return GetResponse{}, err
+			return data, err
 		}
 
 		req.Header.Set("User-Agent", "MyLrcFetcher/1.0")
 
-		respGet, err := fetcher.client.Do(req)
+		resp, err := fetcher.client.Do(req)
 		if err != nil {
 			if attempt < fetcher.maxRetries {
 				time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
 				continue
 			}
 			fetcher.logger.Always("[%0*d/%0*d] Network error after retries: %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName)
-			return GetResponse{}, err
+			return data, err
 		}
 		
-		func ()  {
-			defer respGet.Body.Close()
-
-			if respGet.StatusCode == http.StatusTooManyRequests || respGet.StatusCode >= 500 {
-				if attempt < fetcher.maxRetries - 1 {
-					time.Sleep(time.Duration(attempt) * 1 * time.Second)
-					return
-				}
-				fetcher.logger.Always("[%0*d/%0*d] HTTP %d (Rate limited / Server error): %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, respGet.StatusCode, formattingData.trackName)
-				return
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+			resp.Body.Close()
+			if attempt < fetcher.maxRetries - 1 {
+				time.Sleep(time.Duration(attempt) * 1 * time.Second)
+				continue
 			}
-
-			if respGet.StatusCode == http.StatusNotFound {
-				fetcher.logger.Always("[%0*d/%0*d] Not found (404): %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName)
-				fetcher.stats.notFoundCounter.Add(1)
-				notFound = true
-				return
-			}
-
-			if respGet.StatusCode != http.StatusOK {
-				fetcher.logger.Always("[%0*d/%0*d] HTTP %d: %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, respGet.StatusCode, formattingData.trackName)
-				return
-			}
-
-			if err := json.NewDecoder(respGet.Body).Decode(&data); err != nil {
-				fetcher.logger.Always("[%0*d/%0*d] JSON parse error for %s: %v", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName, err)
-				return
-			}
-
-			fetched = true
-
-		}()
-
-		if fetched {
-			return data, nil
-		} else if notFound {
-			return GetResponse{}, errors.New("NOTHING FOUND 404")
+			fetcher.logger.Always("[%0*d/%0*d] HTTP %d (Rate limited / Server error): %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, resp.StatusCode, formattingData.trackName)
+			return data, fmt.Errorf("HTTP %d", resp.StatusCode)
 		}
+
+		if resp.StatusCode == http.StatusNotFound {
+			resp.Body.Close()
+			fetcher.logger.Always("[%0*d/%0*d] Not found (404): %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName)
+			fetcher.stats.notFoundCounter.Add(1)
+			return data, errors.New("NOTHING FOUND 404")
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			fetcher.logger.Always("[%0*d/%0*d] HTTP %d: %s", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, resp.StatusCode, formattingData.trackName)
+			return data, fmt.Errorf("HTTP %d", resp.StatusCode)
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			fetcher.logger.Always("[%0*d/%0*d] JSON parse error for %s: %v", formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName, err)
+			return data, err
+		}
+
+		return data, nil
 	}
 
-	return GetResponse{}, errors.New("NOTHING FOUND WITH GET")
+	return data, errors.New("NOTHING FOUND WITH GET")
+}
+
+func (fetcher *Fetcher) tryGet(params url.Values, formattingData FormattingData) (GetResponse, error) {
+	return doAPIRequest[GetResponse](fetcher, "get", params, formattingData)
+}
+
 }
 
 func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) LyricsCache {
