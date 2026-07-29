@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -45,7 +44,17 @@ type Fetcher struct {
 	stats *Statistics
 	lyricJobs int
 	maxRetries int
-	logger util.Logger
+	logger *util.Logger
+}
+
+func NewFetcher(stats *Statistics, lyricJobs, maxRetries int, logger *util.Logger) Fetcher {
+	return Fetcher{
+		http.Client{Timeout: 12 * time.Second},
+		stats,
+		lyricJobs,
+		maxRetries,
+		logger,
+	}
 }
 
 func doAPIRequest[T any](fetcher *Fetcher, endpoint string, params url.Values, formattingData FormattingData) (T, error) {
@@ -119,7 +128,7 @@ func (fetcher *Fetcher) trySearch(params url.Values, formattingData FormattingDa
 	return doAPIRequest[[]SearchResponse](fetcher, "search", params, formattingData)
 }
 
-func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) LyricsCache {
+func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache {
 	var wg sync.WaitGroup
 	cache := LyricsCache {
 		cache: make([]LyricTuple, 0, len(tasks)),
@@ -178,7 +187,7 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) LyricsCache 
 	
 	wg.Wait()
 
-	return cache
+	return &cache
 }
 
 func (fetcher *Fetcher) createLyricFiles(lyrics *LyricsCache, jobs int) {
@@ -220,7 +229,7 @@ func (fetcher *Fetcher) createLyricFiles(lyrics *LyricsCache, jobs int) {
 	wg.Wait()
 }
 
-func GetLyrics(config arguments.Config, out io.Writer, stats *Statistics) {
+func (fetcher *Fetcher) GetLyrics(config arguments.Config) {
 	files, err := util.Glob(config.InputPath, ".flac")
 	if err != nil {
 		panic("FAILED TO GLOB FLAC")
@@ -234,29 +243,11 @@ func GetLyrics(config arguments.Config, out io.Writer, stats *Statistics) {
 		files = append(files, mp3...)
 	}
 
-	client := &http.Client{Timeout: 12 * time.Second}
-	jobs := min(max(config.Jobs, 0), runtime.NumCPU())
-	fetchJobs := max(config.FetchJobs, 0)
-	maxRetries := max(config.MaxRetries, 0)
-	logger := util.Logger {
-		Output: out,
-		IsVerbose: config.Verbose,
-		IsDebug: config.Debug,
-	}
-
-	fetcher := Fetcher{
-		*client,
-		stats,
-		fetchJobs,
-		maxRetries,
-		logger,
-	}
-
-	tasks := GetTasks(files, stats, jobs, config.NoSkip, &logger)
+	tasks := GetTasks(files, fetcher.stats, config.Jobs, config.NoSkip, fetcher.logger)
 
 	lyrics := fetcher.fetchLyrics(tasks)
 
-	fetcher.createLyricFiles(&lyrics, jobs)
+	fetcher.createLyricFiles(lyrics, config.Jobs)
 
-	logger.Always("FINISHED")
+	fetcher.logger.Always("FINISHED")
 }

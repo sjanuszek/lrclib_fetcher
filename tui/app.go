@@ -4,6 +4,7 @@ import (
 	"lrclib_fetcher/arguments"
 	"lrclib_fetcher/fetcher"
 	"lrclib_fetcher/tui/components"
+	"lrclib_fetcher/util"
 	"time"
 
 	"github.com/rivo/tview"
@@ -51,7 +52,14 @@ func RunTUI() {
 				}
 			}()
 
-			fetcher.GetLyrics(cfg, loggerTextView, &stats)
+			logger := util.Logger{
+				Output: loggerTextView,
+				IsVerbose: cfg.Verbose,
+				IsDebug: cfg.Debug,
+			}
+			fetcher := fetcher.NewFetcher(&stats, cfg.FetchJobs, cfg.MaxRetries, &logger)
+			fetcher.GetLyrics(cfg)
+
 			close(done)
 		}()
 	}, func(s string) {
