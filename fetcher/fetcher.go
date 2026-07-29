@@ -19,15 +19,6 @@ import (
 	"lrclib_fetcher/util"
 )
 
-type LyricTuple struct {
-	filePath, data string
-}
-
-type LyricsCache struct {
-	mu sync.Mutex
-	cache []LyricTuple
-}
-
 type GetResponse struct {
 	PlainLyrics string `json:"plainLyrics"`
 	SyncedLyrics string `json:"syncedLyrics"`
@@ -41,12 +32,6 @@ type SearchResponse struct {
 	Instrumental bool `json:"instrumental"`
 	PlainLyrics string `json:"plainLyrics"`
 	SyncedLyrics string `json:"syncedLyrics"`
-}
-
-func (lc *LyricsCache) addToCache(filePath string, data string) {
-	lc.mu.Lock()
-	defer lc.mu.Unlock()
-	lc.cache = append(lc.cache, LyricTuple{filePath, data})
 }
 
 type FormattingData struct {
