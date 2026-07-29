@@ -68,7 +68,7 @@ func doAPIRequest[T any](fetcher *Fetcher, endpoint string, params url.Values, f
 
 	requestURL:= APIBase + endpoint + "?" + params.Encode()
 	endpointFormatting := strings.ToUpper(endpoint)
-	for attempt := range fetcher.maxRetries - 1 {
+	for attempt := range fetcher.maxRetries  {
 		fetcher.logger.Debug("%s", requestURL)
 
 		req, err := http.NewRequest("GET", requestURL, nil)
@@ -87,9 +87,15 @@ func doAPIRequest[T any](fetcher *Fetcher, endpoint string, params url.Values, f
 			fetcher.logger.Always("[%s][%0*d/%0*d] Network error after retries: %s", endpointFormatting, formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName)
 			return data, err
 		}
+
+		bodyBytes, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if err != nil {
+			return data, err 
+		}
 		
 		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
-			resp.Body.Close()
 			if attempt < fetcher.maxRetries - 1 {
 				time.Sleep(time.Duration(attempt) * 1 * time.Second)
 				continue
@@ -99,7 +105,6 @@ func doAPIRequest[T any](fetcher *Fetcher, endpoint string, params url.Values, f
 		}
 
 		if resp.StatusCode == http.StatusNotFound {
-			resp.Body.Close()
 			fetcher.logger.Always("[%s][%0*d/%0*d] Not found (404): %s", endpointFormatting, formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName)
 			fetcher.stats.notFoundCounter.Add(1)
 			return data, fmt.Errorf("[%s] NOTHING FOUND 404", endpointFormatting)
@@ -110,7 +115,7 @@ func doAPIRequest[T any](fetcher *Fetcher, endpoint string, params url.Values, f
 			return data, fmt.Errorf("[%s] HTTP %d", endpointFormatting, resp.StatusCode)
 		}
 
-		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		if err := json.Unmarshal(bodyBytes, &data); err != nil {
 			fetcher.logger.Always("[%s][%0*d/%0*d] JSON parse error for %s: %v", endpointFormatting, formattingData.width, formattingData.curr, formattingData.width, formattingData.total, formattingData.trackName, err)
 			return data, err
 		}
