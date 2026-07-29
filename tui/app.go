@@ -1,0 +1,92 @@
+package tui
+
+import (
+	"lrclib_fetcher/arguments"
+	"lrclib_fetcher/fetcher"
+	"lrclib_fetcher/tui/components"
+	"time"
+
+	"github.com/rivo/tview"
+)
+
+var app *tview.Application
+
+func RunTUI() {
+	app = tview.NewApplication()
+
+	pages := tview.NewPages()
+
+	var form *tview.Form
+	var tree *tview.TreeView
+	var statsTextView, loggerTextView  *tview.TextView
+	var processingFlex, mainFlex *tview.Flex
+
+	form = components.MakeMainForm(func() {
+		pages.SwitchToPage("browser")
+		app.SetFocus(tree)
+	}, func(cfg arguments.Config) {
+		pages.SwitchToPage("processing")
+		app.SetFocus(processingFlex)
+		
+		go func() {
+			var stats fetcher.Statistics
+
+			ticker := time.NewTicker(100 * time.Millisecond)
+			done := make(chan struct{})
+
+			go func()  {
+				for {
+					select {
+					case <- ticker.C:
+						app.QueueUpdateDraw(func() {
+							statsTextView.SetText(stats.String())
+						})
+					case <- done:
+						ticker.Stop()
+						app.QueueUpdateDraw(func() {
+							statsTextView.SetText(stats.String())
+						})
+						return
+					}
+				}
+			}()
+
+			fetcher.GetLyrics(cfg, loggerTextView, &stats)
+			close(done)
+		}()
+	})
+
+	tree = components.MakeTreeBrowser(func(path string) {
+		if input, ok := form.GetFormItemByLabel("Input path").(*tview.InputField); ok {
+			input.SetText(path)
+		}
+		pages.SwitchToPage("main")
+		app.SetFocus(form)
+	}, func() {
+		pages.SwitchToPage("main")
+		app.SetFocus(form)
+	})
+
+	statsTextView, loggerTextView = components.MakeProcessingTextViews()
+
+	loggerTextView.SetChangedFunc(func() {
+		loggerTextView.ScrollToEnd()
+		app.Draw()
+	})
+
+	processingFlex = tview.NewFlex().
+		AddItem(statsTextView, 0, 1, true).
+		AddItem(loggerTextView, 0, 3, true)
+
+	mainFlex = tview.NewFlex().
+		AddItem(form, 0, 1, true)
+
+	pages.
+		AddPage("main", mainFlex, true, true).
+		AddPage("browser", tree, true, false).
+		AddPage("processing", processingFlex, true, false)
+
+	if err := app.SetRoot(pages, true).EnableMouse(true).Run(); err != nil {
+		panic(err)
+	}
+}

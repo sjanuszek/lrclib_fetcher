@@ -3,6 +3,7 @@ package fetcher
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -56,7 +57,7 @@ type FormattingData struct {
 
 type Fetcher struct {
 	client http.Client
-	stats Statistics
+	stats *Statistics
 	lyricJobs int
 	maxRetries int
 	logger util.Logger
@@ -229,7 +230,7 @@ func (fetcher *Fetcher) createLyricFiles(lyrics *LyricsCache, jobs int) {
 	wg.Wait()
 }
 
-func GetLyrics(config arguments.Config) Statistics {
+func GetLyrics(config arguments.Config, out io.Writer, stats *Statistics) {
 	files, err := util.Glob(config.InputPath, ".flac")
 	if err != nil {
 		panic("FAILED TO GLOB FLAC")
@@ -243,13 +244,12 @@ func GetLyrics(config arguments.Config) Statistics {
 		files = append(files, mp3...)
 	}
 
-	var stats Statistics
 	client := &http.Client{Timeout: 12 * time.Second}
 	jobs := min(max(config.Jobs, 0), runtime.NumCPU())
 	fetchJobs := max(config.FetchJobs, 0)
 	maxRetries := max(config.MaxRetries, 0)
 	logger := util.Logger {
-		Output: os.Stdout,
+		Output: out,
 		IsVerbose: config.Verbose,
 		IsDebug: config.Debug,
 	}
@@ -262,11 +262,11 @@ func GetLyrics(config arguments.Config) Statistics {
 		logger,
 	}
 
-	tasks := GetTasks(files, &stats, jobs, config.NoSkip, &logger)
+	tasks := GetTasks(files, stats, jobs, config.NoSkip, &logger)
 
 	lyrics := fetcher.fetchLyrics(tasks)
 
 	fetcher.createLyricFiles(&lyrics, jobs)
 
-	return stats
+	logger.Always("FINISHED")
 }

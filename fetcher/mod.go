@@ -13,15 +13,13 @@ type Statistics struct {
 
 func (s *Statistics) String() string {
 	return fmt.Sprintf(
-		"\n================ Statistics ================\n"+
 		"Files Found: %d\n"+
 		"Skipped (.lrc exists): %d\n"+
 		"Metadata Processed: %d\n"+
 		"Synced Lyrics Fetched: %d\n"+
 		"Plain Lyrics Fetched: %d\n"+
 		"Not Found (404): %d\n"+
-		"Failed / No Lyrics: %d\n"+
-		"============================================",
+		"Failed / No Lyrics: %d\n",
 		s.filesCounter.Load(),
 		s.skippedCounter.Load(),
 		s.processedCounter.Load(),
