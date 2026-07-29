@@ -54,6 +54,14 @@ func RunTUI() {
 			fetcher.GetLyrics(cfg, loggerTextView, &stats)
 			close(done)
 		}()
+	}, func(s string) {
+		error_popup := components.MakeErrorPopup(s, func() {
+			pages.RemovePage("error_popup")
+			app.SetFocus(form)
+		})
+
+		pages.AddPage("error_popup", error_popup, false, true)
+		app.SetFocus(error_popup)
 	})
 
 	tree = components.MakeTreeBrowser(func(path string) {

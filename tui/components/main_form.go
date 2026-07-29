@@ -12,7 +12,7 @@ func verifyMainForm() error {
 	return nil
 }
 
-func MakeMainForm(onBrowse func(), onRun func(arguments.Config)) *tview.Form {
+func MakeMainForm(onBrowse func(), onRun func(arguments.Config), onError func(string)) *tview.Form {
 	var form *tview.Form
 
 	pathInput := tview.NewInputField().
@@ -86,8 +86,8 @@ func MakeMainForm(onBrowse func(), onRun func(arguments.Config)) *tview.Form {
 			}
 
 			if err := cfg.VerifyConfig(); err != nil {
-				// implement popup
-				panic(err)
+				onError(err.Error())
+				return
 			}
 
 			onRun(cfg)
