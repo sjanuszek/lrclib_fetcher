@@ -249,6 +249,7 @@ func GetLyrics(config arguments.Config) Statistics {
 	fetchJobs := max(config.FetchJobs, 0)
 	maxRetries := max(config.MaxRetries, 0)
 	logger := util.Logger {
+		Output: os.Stdout,
 		IsVerbose: config.Verbose,
 		IsDebug: config.Debug,
 	}
