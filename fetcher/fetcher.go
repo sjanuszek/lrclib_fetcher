@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -57,6 +58,14 @@ func NewFetcher(stats *Statistics, lyricJobs, maxRetries int, logger *util.Logge
 	}
 }
 
+func parseRetryAfter(header string) time.Duration {
+	if sec, err := strconv.Atoi(header); err == nil && sec > 0 {
+		return time.Duration(sec) * time.Second
+	}
+
+	return 2 * time.Second 
+}
+
 func doAPIRequest[T any](fetcher *Fetcher, endpoint string, params url.Values, formattingData FormattingData) (T, error) {
 	var data T
 
@@ -70,7 +79,7 @@ func doAPIRequest[T any](fetcher *Fetcher, endpoint string, params url.Values, f
 			return data, err
 		}
 
-		req.Header.Set("User-Agent", "MyLrcFetcher/1.0")
+		req.Header.Set("User-Agent", Header)
 
 		resp, err := fetcher.client.Do(req)
 		if err != nil {
@@ -89,12 +98,14 @@ func doAPIRequest[T any](fetcher *Fetcher, endpoint string, params url.Values, f
 			return data, err 
 		}
 		
-		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+		if resp.StatusCode == http.StatusTooManyRequests {
+			retryAfter := parseRetryAfter(resp.Header.Get("Retry-After"))
 			if attempt < fetcher.maxRetries - 1 {
-				time.Sleep(time.Duration(attempt) * 1 * time.Second)
+				fetcher.logger.Always("[%s][%0*d/%0*d] HTTP %d (Rate Limited). Retrying in %v: %s", endpointFormatting, formattingData.width, formattingData.curr, formattingData.width, formattingData.total, resp.StatusCode, retryAfter, formattingData.trackName)
+				time.Sleep(retryAfter)
 				continue
 			}
-			fetcher.logger.Always("[%s][%0*d/%0*d] HTTP %d (Rate limited / Server error): %s", endpointFormatting, formattingData.width, formattingData.curr, formattingData.width, formattingData.total, resp.StatusCode, formattingData.trackName)
+			fetcher.logger.Always("[%s][%0*d/%0*d] HTTP %d Rate limit exceeded: %s", endpointFormatting, formattingData.width, formattingData.curr, formattingData.width, formattingData.total, resp.StatusCode, formattingData.trackName)
 			return data, fmt.Errorf("[%s] HTTP %d", endpointFormatting, resp.StatusCode)
 		}
 
@@ -144,6 +155,8 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache
 		wg.Go(func() {
 			for task := range taskCh {
 				curr := counter.Add(1)
+
+				time.Sleep(250 * time.Millisecond)
 
 				params := url.Values{}
 				params.Add("artist_name", task.ArtistName)
