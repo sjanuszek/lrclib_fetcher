@@ -10,17 +10,18 @@ import (
 
 func MakeStatusView() *tview.TextView {
 	status := tview.NewTextView()
+	status.SetDynamicColors(true)
 
-	status.SetText("Checking API...")
+	status.SetText("[#e3b341]Checking API...[-]")
 
 	return status
 }
 
 func UpdateStatusView(view *tview.TextView, online bool) {
 	if online {
-		view.SetText("LRCLIB: Online")
+		view.SetText("[#7ee787]LRCLIB: Online[-]")
 	} else {
-		view.SetText("LRCLIB: Offline")
+		view.SetText("[#f85149]LRCLIB: Offline[-]")
 	}
 }
 
