@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"lrclib_fetcher/arguments"
 	"lrclib_fetcher/fetcher"
 	"lrclib_fetcher/tui/components"
@@ -68,9 +69,46 @@ func RunTUI() {
 			}
 			fetcher := fetcher.NewFetcher(&stats, cfg.FetchJobs, cfg.MaxRetries, &logger)
 			cache := fetcher.GetLyrics(cfg)
-			cache.CreateLyricFiles(cfg.Jobs, &logger)
-
 			close(done)
+
+			app.QueueUpdateDraw(func() {
+				unresolved := cache.Unresolved
+
+				writeFiles := func() {
+					app.QueueUpdateDraw(func() {
+						pages.SwitchToPage("processing")
+						app.SetFocus(processingFlex)
+					})
+					cache.CreateLyricFiles(cfg.Jobs, &logger)
+				}
+
+				if len(unresolved) == 0 {
+					go writeFiles()
+					return
+				}
+
+				var advanceReview func(int)
+				advanceReview = func(index int) {
+					if index >= len(unresolved) {
+						go writeFiles()
+						return
+					}
+
+					item := unresolved[index]
+					pageName := fmt.Sprintf("review-%d", index)
+
+					reviewFlex := components.MakeReviewPanelFlex(item.Candidates, index, len(unresolved), func(lyrics string) {
+						cache.AddToResolved(item.Data.FilePath, lyrics)
+						pages.RemovePage(pageName)
+						advanceReview(index + 1)
+					})
+
+					pages.AddPage(pageName, reviewFlex, true, true)
+					app.SetFocus(reviewFlex)
+				}
+
+				advanceReview(0)
+			})
 		}()
 	}, func(s string) {
 		error_popup := components.MakeErrorPopup(s, func() {
@@ -100,7 +138,7 @@ func RunTUI() {
 		app.Draw()
 	})
 
-	headerFlex := tview.NewFlex().
+	footerFlex := tview.NewFlex().
 		SetDirection(tview.FlexColumn).
 		AddItem(tview.NewBox(), 0, 1, false).
 		AddItem(status, 25, 0, false)
@@ -111,8 +149,8 @@ func RunTUI() {
 
 	mainFlex = tview.NewFlex().
 		SetDirection(tview.FlexRow).
-		AddItem(headerFlex, 1, 0, false).
-		AddItem(form, 0, 1, true)
+		AddItem(form, 0, 1, true).
+		AddItem(footerFlex, 1, 0, false)
 
 	pages.
 		AddPage("main", mainFlex, true, true).
