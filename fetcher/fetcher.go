@@ -17,21 +17,6 @@ import (
 	"lrclib_fetcher/util"
 )
 
-type GetResponse struct {
-	PlainLyrics string `json:"plainLyrics"`
-	SyncedLyrics string `json:"syncedLyrics"`
-}
-
-type SearchResponse struct {
-	TrackName string `json:"trackName"`
-	ArtistName string `json:"artistName"`
-	AlbumName string `json:"albumName"`
-	Duration float32 `json:"duration"`
-	Instrumental bool `json:"instrumental"`
-	PlainLyrics string `json:"plainLyrics"`
-	SyncedLyrics string `json:"syncedLyrics"`
-}
-
 type FormattingData struct {
 	width, total int
 	curr int64
@@ -179,7 +164,7 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache
 				if err != nil || syncedLyrics == "" {
 					fetcher.logger.Always("[%0*d/%0*d] Failed to fetch lyrics using get (%s) trying search: %s", width, curr, width, total, err, task.TrackName)
 					respSearch, err := fetcher.trySearch(params, formattingData)
-					if err != nil {
+					if err != nil || len(respSearch) == 0 {
 						fetcher.logger.Always("[%0*d/%0*d] Failed to fetch lyrics using search (%s): %s", width, curr, width, total, err, task.TrackName)
 					} else {
 						fetcher.logger.Always("[%0*d/%0*d] Fetch lyrics using search (%s): %s", width, curr, width, total, err, task.TrackName)
