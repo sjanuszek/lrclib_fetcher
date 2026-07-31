@@ -33,10 +33,27 @@ func MakeReviewPanelFlex(responses []fetcher.SearchResponse, curr, total int, on
 
 	list = tview.NewList()
 	for i, resp := range responses {
+		hasSynced := responses[i].SyncedLyrics != ""
+		hasPlain := responses[i].PlainLyrics != ""
+
+		var versionInfo string
+		switch {
+		case hasSynced && hasPlain:
+			versionInfo = fmt.Sprintf(" [#7ee787]%s[-]", tview.Escape("[S/P]"))
+		case hasSynced:
+			versionInfo = fmt.Sprintf(" [#7ee787]%s[-]", tview.Escape("[S]"))
+		case hasPlain:
+			versionInfo = fmt.Sprintf(" [#e3b341]%s[-]", tview.Escape("[P]"))
+		default:
+			versionInfo = fmt.Sprintf(" [#f85149]%s[-]", tview.Escape("[No Lyrics]"))
+		}
+
 		shortcut := getShortcutRune(i)
+		
+		header := fmt.Sprintf("%s" + versionInfo, resp.TrackName)
 		description := fmt.Sprintf("%s - %s", resp.AlbumName, resp.ArtistName)
 
-		list.AddItem(resp.TrackName, description, shortcut, nil)
+		list.AddItem(header, description, shortcut, nil)
 	}
 
 	updateText := func() {
