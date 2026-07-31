@@ -19,8 +19,17 @@ func RunTUI() {
 
 	var form *tview.Form
 	var tree *tview.TreeView
+	var status *tview.TextView
 	var statsTextView, loggerTextView  *tview.TextView
 	var processingFlex, mainFlex *tview.Flex
+
+	status = components.MakeStatusView()
+
+	components.StartHealthCheck(func(online bool) {
+		app.QueueUpdateDraw(func() {
+			components.UpdateStatusView(status, online)
+		})
+	})
 
 	form = components.MakeMainForm(func() {
 		pages.SwitchToPage("browser")
@@ -90,11 +99,18 @@ func RunTUI() {
 		app.Draw()
 	})
 
+	headerFlex := tview.NewFlex().
+		SetDirection(tview.FlexColumn).
+		AddItem(tview.NewBox(), 0, 1, false).
+		AddItem(status, 25, 0, false)
+
 	processingFlex = tview.NewFlex().
 		AddItem(statsTextView, 0, 1, true).
 		AddItem(loggerTextView, 0, 3, true)
 
 	mainFlex = tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(headerFlex, 1, 0, false).
 		AddItem(form, 0, 1, true)
 
 	pages.
