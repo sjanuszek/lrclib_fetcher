@@ -142,8 +142,10 @@ func (fetcher *Fetcher) trySearch(params url.Values, formattingData FormattingDa
 func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache {
 	var wg sync.WaitGroup
 	cache := LyricsCache {
-		cache: make([]LyricTuple, 0, len(tasks)),
+		resolved: make([]LyricTuple, 0, len(tasks)),
+		unresolved: make([]UnresolvedLyrics, 0, len(tasks)),
 	}
+
 	taskCh := make(chan metadata.NecessaryData, len(tasks))
 
 	total := len(tasks)
@@ -171,20 +173,31 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache
 					task.TrackName,
 				}
 
-				respGet, err := fetcher.tryGet(params, formattingData)
+				var syncedLyrics, plainLyrics string
 
-				if err != nil {
-					fetcher.logger.Always("[%0*d/%0*d] Failed to fetch lyrics using get: %s", width, curr, width, total, task.TrackName)
+				respGet, err := fetcher.tryGet(params, formattingData)
+				plainLyrics, syncedLyrics = respGet.PlainLyrics, respGet.SyncedLyrics
+
+				if err != nil || syncedLyrics == "" {
+					fetcher.logger.Always("[%0*d/%0*d] Failed to fetch lyrics using get (%s) trying search: %s", width, curr, width, total, err, task.TrackName)
+					respSearch, err := fetcher.trySearch(params, formattingData)
+					if err != nil {
+						fetcher.logger.Always("[%0*d/%0*d] Failed to fetch lyrics using search (%s): %s", width, curr, width, total, err, task.TrackName)
+					} else {
+						fetcher.logger.Always("[%0*d/%0*d] Fetch lyrics using search (%s): %s", width, curr, width, total, err, task.TrackName)
+						cache.addToUnresolved(respSearch, task)
+					}
+
 				}
 				
-				if respGet.SyncedLyrics != "" {
+				if syncedLyrics != "" {
 					fetcher.logger.Verbose("[%0*d/%0*d] Fetched synced lyrics: %s", width, curr, width, total, task.TrackName)
 					fetcher.stats.syncedCounter.Add(1)
-					cache.addToCache(task.FilePath, respGet.SyncedLyrics)
-				} else if respGet.PlainLyrics != "" {
+					cache.addToResolved(task.FilePath, syncedLyrics)
+				} else if plainLyrics != "" {
 					fetcher.logger.Verbose("[%0*d/%0*d] Fetched plain lyrics: %s", width, curr, width, total, task.TrackName)
 					fetcher.stats.plainCounter.Add(1)
-					cache.addToCache(task.FilePath, respGet.PlainLyrics)
+					cache.addToResolved(task.FilePath, plainLyrics)
 				} else {
 					fetcher.logger.Always("[%0*d/%0*d] Track found but contains no lyrics: %s", width, curr, width, total, task.TrackName)
 					fetcher.stats.failedCounter.Add(1)
@@ -203,11 +216,11 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache
 	return &cache
 }
 
-func (fetcher *Fetcher) createLyricFiles(lyrics *LyricsCache, jobs int) {
+func (fetcher *Fetcher) CreateLyricFiles(lyrics *LyricsCache, jobs int) {
 	var wg sync.WaitGroup
-	jobCh := make(chan LyricTuple, len(lyrics.cache))
+	jobCh := make(chan LyricTuple, len(lyrics.resolved))
 
-	total := len(lyrics.cache)
+	total := len(lyrics.resolved)
 	width := len(fmt.Sprintf("%d", total))
 
 	var counter atomic.Int64
@@ -234,7 +247,7 @@ func (fetcher *Fetcher) createLyricFiles(lyrics *LyricsCache, jobs int) {
 		})
 	}
 
-	for _, tuple := range lyrics.cache {
+	for _, tuple := range lyrics.resolved {
 		jobCh <- tuple
 	}
 	close(jobCh)
@@ -242,7 +255,7 @@ func (fetcher *Fetcher) createLyricFiles(lyrics *LyricsCache, jobs int) {
 	wg.Wait()
 }
 
-func (fetcher *Fetcher) GetLyrics(config arguments.Config) {
+func (fetcher *Fetcher) GetLyrics(config arguments.Config) *LyricsCache {
 	files, err := util.Glob(config.InputPath, ".flac")
 	if err != nil {
 		panic("FAILED TO GLOB FLAC")
@@ -258,9 +271,9 @@ func (fetcher *Fetcher) GetLyrics(config arguments.Config) {
 
 	tasks := GetTasks(files, fetcher.stats, config.Jobs, config.NoSkip, fetcher.logger)
 
-	lyrics := fetcher.fetchLyrics(tasks)
-
-	fetcher.createLyricFiles(lyrics, config.Jobs)
+	cache := fetcher.fetchLyrics(tasks)
 
 	fetcher.logger.Always("FINISHED")
+
+	return cache
 }
