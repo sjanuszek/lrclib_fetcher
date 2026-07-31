@@ -68,7 +68,7 @@ func RunTUI() {
 			}
 			fetcher := fetcher.NewFetcher(&stats, cfg.FetchJobs, cfg.MaxRetries, &logger)
 			cache := fetcher.GetLyrics(cfg)
-			fetcher.CreateLyricFiles(cache, cfg.Jobs)
+			cache.CreateLyricFiles(cfg.Jobs, &logger)
 
 			close(done)
 		}()

@@ -6,8 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -142,8 +140,8 @@ func (fetcher *Fetcher) trySearch(params url.Values, formattingData FormattingDa
 func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache {
 	var wg sync.WaitGroup
 	cache := LyricsCache {
-		resolved: make([]LyricTuple, 0, len(tasks)),
-		unresolved: make([]UnresolvedLyrics, 0, len(tasks)),
+		Resolved: make([]LyricTuple, 0, len(tasks)),
+		Unresolved: make([]UnresolvedLyrics, 0, len(tasks)),
 	}
 
 	taskCh := make(chan metadata.NecessaryData, len(tasks))
@@ -193,11 +191,11 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache
 				if syncedLyrics != "" {
 					fetcher.logger.Verbose("[%0*d/%0*d] Fetched synced lyrics: %s", width, curr, width, total, task.TrackName)
 					fetcher.stats.syncedCounter.Add(1)
-					cache.addToResolved(task.FilePath, syncedLyrics)
+					cache.AddToResolved(task.FilePath, syncedLyrics)
 				} else if plainLyrics != "" {
 					fetcher.logger.Verbose("[%0*d/%0*d] Fetched plain lyrics: %s", width, curr, width, total, task.TrackName)
 					fetcher.stats.plainCounter.Add(1)
-					cache.addToResolved(task.FilePath, plainLyrics)
+					cache.AddToResolved(task.FilePath, plainLyrics)
 				} else {
 					fetcher.logger.Always("[%0*d/%0*d] Track found but contains no lyrics: %s", width, curr, width, total, task.TrackName)
 					fetcher.stats.failedCounter.Add(1)
@@ -214,45 +212,6 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache
 	wg.Wait()
 
 	return &cache
-}
-
-func (fetcher *Fetcher) CreateLyricFiles(lyrics *LyricsCache, jobs int) {
-	var wg sync.WaitGroup
-	jobCh := make(chan LyricTuple, len(lyrics.resolved))
-
-	total := len(lyrics.resolved)
-	width := len(fmt.Sprintf("%d", total))
-
-	var counter atomic.Int64
-
-	for range jobs {
-		wg.Go(func() {
-			for tuple := range jobCh {
-				curr := counter.Add(1)
-				ext := filepath.Ext(tuple.filePath)
-				new_path := strings.TrimSuffix(tuple.filePath, ext) + ".lrc"
-
-				fetcher.logger.Verbose("[%0*d/%0*d] Writing: %s", width, curr, width, total, new_path)
-
-				err := os.WriteFile(
-					new_path,
-					[]byte(tuple.data),
-					0644,
-				)
-
-				if err != nil {
-					fmt.Println(err)
-				}
-			}
-		})
-	}
-
-	for _, tuple := range lyrics.resolved {
-		jobCh <- tuple
-	}
-	close(jobCh)
-
-	wg.Wait()
 }
 
 func (fetcher *Fetcher) GetLyrics(config arguments.Config) *LyricsCache {
