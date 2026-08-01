@@ -22,7 +22,7 @@ func RunTUI() {
 	var tree *tview.TreeView
 	var status *tview.TextView
 	var statsTextView, loggerTextView  *tview.TextView
-	var processingFlex, mainFlex *tview.Flex
+	var processingFlex, mainFlex, treeFlex, reviewFooterFLex, mainFooterFlex, treeFooterFlex *tview.Flex
 
 	status = components.MakeStatusView()
 
@@ -97,11 +97,16 @@ func RunTUI() {
 					item := unresolved[index]
 					pageName := fmt.Sprintf("review-%d", index)
 
-					reviewFlex := components.MakeReviewPanelFlex(item.Candidates, index, len(unresolved), func(lyrics string) {
+					reviewPanel := components.MakeReviewPanelFlex(item.Candidates, index, len(unresolved), func(lyrics string) {
 						cache.AddToResolved(item.Data.FilePath, lyrics)
 						pages.RemovePage(pageName)
 						advanceReview(index + 1)
 					})
+
+					reviewFlex := tview.NewFlex().
+						SetDirection(tview.FlexRow).
+						AddItem(reviewPanel, 0, 1, true).
+						AddItem(reviewFooterFLex, 1, 0, false)
 
 					pages.AddPage(pageName, reviewFlex, true, true)
 					app.SetFocus(reviewFlex)
@@ -138,10 +143,21 @@ func RunTUI() {
 		app.Draw()
 	})
 
-	footerFlex := tview.NewFlex().
+	reviewFooterFLex = tview.NewFlex().
+		AddItem(components.MakeFooterView("[TAB] - Cycle between lyric types, [ENTER] - Select lyrics"), 0, 1, false)
+
+	treeFooterFlex = tview.NewFlex().
+		AddItem(components.MakeFooterView("[TAB] - Move up directory, [SHIFT + TAB] - Enter directory, [ENTER] - Select directory"), 0, 1, false)
+
+	mainFooterFlex = tview.NewFlex().
 		SetDirection(tview.FlexColumn).
-		AddItem(tview.NewBox(), 0, 1, false).
+		AddItem(components.MakeFooterView("[TAB] - Move to next form option, [SHIFT + TAB] - Move to previous form option"), 0, 1, false).
 		AddItem(status, 25, 0, false)
+	
+	treeFlex = tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(tree, 0, 1, true).
+		AddItem(treeFooterFlex, 1, 0, false)
 
 	processingFlex = tview.NewFlex().
 		AddItem(statsTextView, 0, 1, true).
@@ -150,11 +166,11 @@ func RunTUI() {
 	mainFlex = tview.NewFlex().
 		SetDirection(tview.FlexRow).
 		AddItem(form, 0, 1, true).
-		AddItem(footerFlex, 1, 0, false)
+		AddItem(mainFooterFlex, 1, 0, false)
 
 	pages.
 		AddPage("main", mainFlex, true, true).
-		AddPage("browser", tree, true, false).
+		AddPage("browser", treeFlex, true, false).
 		AddPage("processing", processingFlex, true, false)
 
 	if err := app.SetRoot(pages, true).EnableMouse(true).Run(); err != nil {
