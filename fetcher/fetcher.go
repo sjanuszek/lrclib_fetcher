@@ -114,7 +114,7 @@ func doAPIRequest[T any](fetcher *Fetcher, endpoint string, params url.Values, f
 	return data, fmt.Errorf("NOTHING FOUND WITH %s", endpointFormatting)
 }
 
-func checkIfNoInstrumental(responses []SearchResponse) bool {
+func checkIfAllInstrumental(responses []SearchResponse) bool {
 	for _, resp := range responses {
 		if !resp.Instrumental {
 			return false
@@ -173,16 +173,16 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache
 
 				if err != nil || syncedLyrics == "" {
 					fetcher.logger.Always("[%0*d/%0*d] Failed to fetch lyrics using get (%s) trying search: %s", width, curr, width, total, err, task.TrackName)
+
 					respSearch, err := fetcher.trySearch(params, formattingData)
 					if err != nil || len(respSearch) == 0 {
 						fetcher.logger.Always("[%0*d/%0*d] Failed to fetch lyrics using search (%s): %s", width, curr, width, total, err, task.TrackName)
-					} else if checkIfNoInstrumental(respSearch) {
+					} else if checkIfAllInstrumental(respSearch) {
 						fetcher.logger.Always("[%0*d/%0*d] Is instrumental: %s", width, curr, width, total, task.TrackName)
 					} else {
 						fetcher.logger.Always("[%0*d/%0*d] Fetch lyrics using search (%s): %s", width, curr, width, total, err, task.TrackName)
 						cache.addToUnresolved(respSearch, task)
 					}
-
 				}
 				
 				if syncedLyrics != "" {
