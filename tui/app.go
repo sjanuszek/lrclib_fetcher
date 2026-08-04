@@ -147,7 +147,7 @@ func RunTUI() {
 		AddItem(components.MakeFooterView("[TAB] - Cycle between lyric types, [ENTER] - Select lyrics"), 0, 1, false)
 
 	treeFooterFlex = tview.NewFlex().
-		AddItem(components.MakeFooterView("[TAB] - Move up directory, [SHIFT + TAB] - Enter directory, [ENTER] - Select directory"), 0, 1, false)
+		AddItem(components.MakeFooterView("[TAB] - Move up directory, [SHIFT + CTRL] - Enter directory, [ENTER] - Select directory"), 0, 1, false)
 
 	mainFooterFlex = tview.NewFlex().
 		SetDirection(tview.FlexColumn).
