@@ -124,6 +124,16 @@ func checkIfAllInstrumental(responses []SearchResponse) bool {
 	return true
 }
 
+func checkIfAllPlain(responses []SearchResponse) bool {
+	for _, resp := range responses {
+		if resp.SyncedLyrics != "" {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (fetcher *Fetcher) tryGet(params url.Values, formattingData FormattingData) (GetResponse, error) {
 	return doAPIRequest[GetResponse](fetcher, "get", params, formattingData)
 }
@@ -166,37 +176,49 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache
 					task.TrackName,
 				}
 
-				var syncedLyrics, plainLyrics string
+				respGet, errGet := fetcher.tryGet(params, formattingData)
 
-				respGet, err := fetcher.tryGet(params, formattingData)
-				plainLyrics, syncedLyrics = respGet.PlainLyrics, respGet.SyncedLyrics
-
-				if err != nil || syncedLyrics == "" {
-					fetcher.logger.Always("[%0*d/%0*d] Failed to fetch lyrics using get (%s) trying search: %s", width, curr, width, total, err, task.TrackName)
-
-					respSearch, err := fetcher.trySearch(params, formattingData)
-					if err != nil || len(respSearch) == 0 {
-						fetcher.logger.Always("[%0*d/%0*d] Failed to fetch lyrics using search (%s): %s", width, curr, width, total, err, task.TrackName)
-					} else if checkIfAllInstrumental(respSearch) {
-						fetcher.logger.Always("[%0*d/%0*d] Is instrumental: %s", width, curr, width, total, task.TrackName)
-					} else {
-						fetcher.logger.Always("[%0*d/%0*d] Fetch lyrics using search (%s): %s", width, curr, width, total, err, task.TrackName)
-						cache.addToUnresolved(respSearch, task)
-					}
-				}
-				
-				if syncedLyrics != "" {
+				if errGet == nil && respGet.SyncedLyrics != "" {
 					fetcher.logger.Verbose("[%0*d/%0*d] Fetched synced lyrics: %s", width, curr, width, total, task.TrackName)
 					fetcher.stats.syncedCounter.Add(1)
-					cache.AddToResolved(task.FilePath, syncedLyrics)
-				} else if plainLyrics != "" {
+					cache.AddToResolved(task.FilePath, respGet.SyncedLyrics)
+					continue
+				}
+
+				if errGet == nil && respGet.Instrumental {
+					fetcher.logger.Always("[%0*d/%0*d] Track is instrumental: %s", width, curr, width, total, task.TrackName)
+					continue
+				}
+
+				respSearch, errSearch := fetcher.trySearch(params, formattingData)
+
+				if errSearch == nil && len(respSearch) > 0 {
+					if checkIfAllInstrumental(respSearch) {
+						fetcher.logger.Always("[%0*d/%0*d] All search candidates are instrumental: %s", width, curr, width, total, task.TrackName)
+						continue
+					}
+
+					if checkIfAllPlain(respSearch) && errGet == nil && respGet.PlainLyrics != "" {
+						fetcher.logger.Verbose("[%0*d/%0*d] Fetched plain lyrics (no synced version found): %s", width, curr, width, total, task.TrackName)
+						fetcher.stats.plainCounter.Add(1)
+						cache.AddToResolved(task.FilePath, respGet.PlainLyrics)
+						continue
+					}
+
+					fetcher.logger.Always("[%0*d/%0*d] Sent to review queue: %s", width, curr, width, total, task.TrackName)
+					cache.addToUnresolved(respSearch, task)
+					continue
+				}
+
+				if errGet == nil && respGet.PlainLyrics != "" {
 					fetcher.logger.Verbose("[%0*d/%0*d] Fetched plain lyrics: %s", width, curr, width, total, task.TrackName)
 					fetcher.stats.plainCounter.Add(1)
-					cache.AddToResolved(task.FilePath, plainLyrics)
-				} else {
-					fetcher.logger.Always("[%0*d/%0*d] Track found but contains no lyrics: %s", width, curr, width, total, task.TrackName)
-					fetcher.stats.failedCounter.Add(1)
+					cache.AddToResolved(task.FilePath, respGet.PlainLyrics)
+					continue
 				}
+
+				fetcher.logger.Always("[%0*d/%0*d] Track not found or contains no lyrics: %s", width, curr, width, total, task.TrackName)
+				fetcher.stats.failedCounter.Add(1)
 			}
 		})
 	}

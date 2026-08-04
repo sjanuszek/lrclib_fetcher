@@ -3,6 +3,7 @@ package fetcher
 type GetResponse struct {
 	PlainLyrics string `json:"plainLyrics"`
 	SyncedLyrics string `json:"syncedLyrics"`
+	Instrumental bool `json:"instrumental"`
 }
 
 type SearchResponse struct {
