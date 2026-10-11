@@ -247,7 +247,7 @@ func (fetcher *Fetcher) GetLyrics(config arguments.Config) *LyricsCache {
 		files = append(files, mp3...)
 	}
 
-	tasks := GetTasks(files, fetcher.stats, config.Jobs, config.NoSkip, fetcher.logger)
+	tasks := GetTasks(files, fetcher.stats, config.Jobs, config.SkipLrc, config.SkipTxt, fetcher.logger)
 
 	cache := fetcher.fetchLyrics(tasks)
 

@@ -24,10 +24,15 @@ func MakeMainForm(onBrowse func(), onRun func(arguments.Config), onError func(st
 		SetLabel("Enable debug output")
 
 	mp3Check := tview.NewCheckbox().
-		SetLabel("Include mp3 in file search")
+		SetLabel("Include mp3 in file search").
+		SetChecked(true)
 
-	noSkipCheck := tview.NewCheckbox().
-		SetLabel("Don't skip files with existing .lrc files")
+	SkipLrcCheck := tview.NewCheckbox().
+		SetLabel("Skip files with existing .lrc files").
+		SetChecked(true)
+	
+	SkipTxtCheck := tview.NewCheckbox().
+		SetLabel("Skip files with existing .txt files")
 
 	verboseCheck := tview.NewCheckbox().
 		SetLabel("Enable verbose output").
@@ -65,7 +70,8 @@ func MakeMainForm(onBrowse func(), onRun func(arguments.Config), onError func(st
 		AddFormItem(jobsInput).
 		AddFormItem(maxRetriesInput).
 		AddFormItem(mp3Check).
-		AddFormItem(noSkipCheck).
+		AddFormItem(SkipLrcCheck).
+		AddFormItem(SkipTxtCheck).
 		AddFormItem(verboseCheck).
 		AddFormItem(debugCheck).
 		AddButton("Run", func() {
@@ -82,7 +88,8 @@ func MakeMainForm(onBrowse func(), onRun func(arguments.Config), onError func(st
 				ParseMP3: mp3Check.IsChecked(),
 				Verbose: verboseCheck.IsChecked(),
 				Debug: debugCheck.IsChecked(),
-				NoSkip: noSkipCheck.IsChecked(),
+				SkipLrc: SkipLrcCheck.IsChecked(),
+				SkipTxt: SkipTxtCheck.IsChecked(),
 			}
 
 			if err := cfg.VerifyConfig(); err != nil {

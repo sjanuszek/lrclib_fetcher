@@ -4,7 +4,7 @@ import "github.com/spf13/pflag"
 
 var (
 	inputPtr string
-	mp3Ptr, verbosePtr, debugPtr, noSkipPtr bool
+	mp3Ptr, verbosePtr, debugPtr, SkipLrcPtr, SkipTxtPtr bool
 	jobsPtr, fetchJobsPtr, maxRetriesPtr int
 )
 
@@ -23,7 +23,9 @@ func GetConfig() Config {
 
 	pflag.BoolVarP(&debugPtr, "debug", "d", false, "debug")
 
-	pflag.BoolVarP(&noSkipPtr, "no skip", "n", false, "no skip")
+	pflag.BoolVarP(&SkipLrcPtr, "skip lrc", "l", true, "skip txt")
+
+	pflag.BoolVarP(&SkipTxtPtr, "skip txt", "t", false, "skip txt")
 
 	pflag.Parse()
 
@@ -35,6 +37,7 @@ func GetConfig() Config {
 		mp3Ptr,
 		verbosePtr,
 		debugPtr,
-		noSkipPtr,
+		SkipLrcPtr,
+		SkipTxtPtr,
 	}
 }

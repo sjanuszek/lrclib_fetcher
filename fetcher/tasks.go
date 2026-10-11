@@ -11,14 +11,14 @@ import (
 	"sync/atomic"
 )
 
-func hasLrcFile(path string) bool {
-    ext := filepath.Ext(path)
-    lrcPath := strings.TrimSuffix(path, ext) + ".lrc"
+func hasLyricFile(path, ext string) bool {
+    file_ext := filepath.Ext(path)
+    lrcPath := strings.TrimSuffix(path, file_ext) + ext
     _, err := os.Stat(lrcPath)
     return err == nil
 }
 
-func GetTasks(files []string, stats *Statistics, jobs int, noSkip bool, logger *util.Logger) []metadata.NecessaryData {
+func GetTasks(files []string, stats *Statistics, jobs int, SkipLrc, SkipTxt bool, logger *util.Logger) []metadata.NecessaryData {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
@@ -36,7 +36,7 @@ func GetTasks(files []string, stats *Statistics, jobs int, noSkip bool, logger *
 				curr := counter.Add(1)
 				stats.filesCounter.Add(1)
 
-				if !noSkip && hasLrcFile(file_name) {
+				if (SkipLrc && hasLyricFile(file_name, ".lrc")) || (SkipTxt && hasLyricFile(file_name, ".txt")) {
 					logger.Verbose("[%0*d/%0*d] Skipping: %s", width, curr, width, total, file_name)
 					stats.skippedCounter.Add(1)
 					continue

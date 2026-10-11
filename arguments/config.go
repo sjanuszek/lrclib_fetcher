@@ -14,7 +14,8 @@ type Config struct {
 	ParseMP3 bool
 	Verbose bool
 	Debug bool
-	NoSkip bool
+	SkipLrc bool
+	SkipTxt bool
 }
 
 func (cfg *Config) VerifyConfig() error {
