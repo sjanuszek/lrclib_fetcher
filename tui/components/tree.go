@@ -14,6 +14,10 @@ func addChildrenToNode(target *tview.TreeNode, path string) {
 		return
 	}
 
+	current_dir := tview.NewTreeNode(".").SetReference(path)
+	current_dir.SetColor(tcell.ColorGreen)
+	target.AddChild(current_dir)
+
 	for _, file := range files {
 		node := tview.NewTreeNode(file.Name()).SetReference(filepath.Join(path, file.Name()))
 
