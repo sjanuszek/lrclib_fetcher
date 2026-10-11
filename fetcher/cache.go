@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 )
 
-type LyricTuple struct {
-	filePath, data string
+type LyricTruple struct {
+	filePath, data, ext string
 }
 
 type UnresolvedLyrics struct {
@@ -22,14 +22,14 @@ type UnresolvedLyrics struct {
 
 type LyricsCache struct {
 	mu sync.Mutex
-	Resolved []LyricTuple
+	Resolved []LyricTruple
 	Unresolved []UnresolvedLyrics
 }
 
-func (lc *LyricsCache) AddToResolved(filePath string, data string) {
+func (lc *LyricsCache) AddToResolved(filePath, data, ext string) {
 	lc.mu.Lock()
 	defer lc.mu.Unlock()
-	lc.Resolved = append(lc.Resolved, LyricTuple{filePath, data})
+	lc.Resolved = append(lc.Resolved, LyricTruple{filePath, data, ext})
 }
 
 func (lc *LyricsCache) addToUnresolved(candidates []SearchResponse, data metadata.NecessaryData) {
@@ -40,7 +40,7 @@ func (lc *LyricsCache) addToUnresolved(candidates []SearchResponse, data metadat
 
 func (cache *LyricsCache) CreateLyricFiles(jobs int, logger *util.Logger) {
 	var wg sync.WaitGroup
-	jobCh := make(chan LyricTuple, len(cache.Resolved))
+	jobCh := make(chan LyricTruple, len(cache.Resolved))
 
 	total := len(cache.Resolved)
 	width := len(fmt.Sprintf("%d", total))
@@ -49,16 +49,16 @@ func (cache *LyricsCache) CreateLyricFiles(jobs int, logger *util.Logger) {
 
 	for range jobs {
 		wg.Go(func() {
-			for tuple := range jobCh {
+			for truple := range jobCh {
 				curr := counter.Add(1)
-				ext := filepath.Ext(tuple.filePath)
-				new_path := strings.TrimSuffix(tuple.filePath, ext) + ".lrc"
+				ext := filepath.Ext(truple.filePath)
+				new_path := strings.TrimSuffix(truple.filePath, ext) + truple.ext
 
 				logger.Verbose("[%0*d/%0*d] Writing: %s", width, curr, width, total, new_path)
 
 				err := os.WriteFile(
 					new_path,
-					[]byte(tuple.data),
+					[]byte(truple.data),
 					0644,
 				)
 

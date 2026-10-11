@@ -145,7 +145,7 @@ func (fetcher *Fetcher) trySearch(params url.Values, formattingData FormattingDa
 func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache {
 	var wg sync.WaitGroup
 	cache := LyricsCache {
-		Resolved: make([]LyricTuple, 0, len(tasks)),
+		Resolved: make([]LyricTruple, 0, len(tasks)),
 		Unresolved: make([]UnresolvedLyrics, 0, len(tasks)),
 	}
 
@@ -181,7 +181,7 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache
 				if errGet == nil && respGet.SyncedLyrics != "" {
 					fetcher.logger.Verbose("[%0*d/%0*d] Fetched synced lyrics: %s", width, curr, width, total, task.TrackName)
 					fetcher.stats.syncedCounter.Add(1)
-					cache.AddToResolved(task.FilePath, respGet.SyncedLyrics)
+					cache.AddToResolved(task.FilePath, respGet.SyncedLyrics, ".lrc")
 					continue
 				}
 
@@ -201,7 +201,7 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache
 					if checkIfAllPlain(respSearch) && errGet == nil && respGet.PlainLyrics != "" {
 						fetcher.logger.Verbose("[%0*d/%0*d] Fetched plain lyrics (no synced version found): %s", width, curr, width, total, task.TrackName)
 						fetcher.stats.plainCounter.Add(1)
-						cache.AddToResolved(task.FilePath, respGet.PlainLyrics)
+						cache.AddToResolved(task.FilePath, respGet.PlainLyrics, ".txt")
 						continue
 					}
 
@@ -213,7 +213,7 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache
 				if errGet == nil && respGet.PlainLyrics != "" {
 					fetcher.logger.Verbose("[%0*d/%0*d] Fetched plain lyrics: %s", width, curr, width, total, task.TrackName)
 					fetcher.stats.plainCounter.Add(1)
-					cache.AddToResolved(task.FilePath, respGet.PlainLyrics)
+					cache.AddToResolved(task.FilePath, respGet.PlainLyrics, ".txt")
 					continue
 				}
 

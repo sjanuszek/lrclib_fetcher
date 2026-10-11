@@ -18,7 +18,7 @@ func getShortcutRune(index int) rune {
 	return 0
 }
 
-func MakeReviewPanelFlex(responses []fetcher.SearchResponse, curr, total int, onSelect func(lyrics string)) *tview.Flex {
+func MakeReviewPanelFlex(responses []fetcher.SearchResponse, curr, total int, onSelect func(lyrics, ext string)) *tview.Flex {
 	var list *tview.List
 	var text *tview.TextView
 	var flex *tview.Flex
@@ -92,9 +92,9 @@ func MakeReviewPanelFlex(responses []fetcher.SearchResponse, curr, total int, on
 		}
 
 		if synced {
-			onSelect(responses[index].SyncedLyrics)
+			onSelect(responses[index].SyncedLyrics, ".lrc")
 		} else {
-			onSelect(responses[index].PlainLyrics)
+			onSelect(responses[index].PlainLyrics, ".txt")
 		}
 	})
 
