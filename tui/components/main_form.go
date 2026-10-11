@@ -64,6 +64,32 @@ func MakeMainForm(onBrowse func(), onRun func(arguments.Config), onError func(st
 		return event
 	})
 
+	run_func := func() {
+		parseInt := func (s string) int {
+			val, _ := strconv.Atoi(s)
+			return val
+		}
+
+		cfg := arguments.Config{
+			InputPath: pathInput.GetText(),
+			Jobs: parseInt(jobsInput.GetText()),
+			FetchJobs: parseInt(fetchJobsInput.GetText()),
+			MaxRetries: parseInt(maxRetriesInput.GetText()),
+			ParseMP3: mp3Check.IsChecked(),
+			Verbose: verboseCheck.IsChecked(),
+			Debug: debugCheck.IsChecked(),
+			SkipLrc: SkipLrcCheck.IsChecked(),
+			SkipTxt: SkipTxtCheck.IsChecked(),
+		}
+
+		if err := cfg.VerifyConfig(); err != nil {
+			onError(err.Error())
+			return
+		}
+
+		onRun(cfg)
+	}
+
 	form = tview.NewForm().
 		AddFormItem(pathInput).
 		AddFormItem(fetchJobsInput).
@@ -74,31 +100,7 @@ func MakeMainForm(onBrowse func(), onRun func(arguments.Config), onError func(st
 		AddFormItem(SkipTxtCheck).
 		AddFormItem(verboseCheck).
 		AddFormItem(debugCheck).
-		AddButton("Run", func() {
-			parseInt := func (s string) int {
-				val, _ := strconv.Atoi(s)
-				return val
-			}
-
-			cfg := arguments.Config{
-				InputPath: pathInput.GetText(),
-				Jobs: parseInt(jobsInput.GetText()),
-				FetchJobs: parseInt(fetchJobsInput.GetText()),
-				MaxRetries: parseInt(maxRetriesInput.GetText()),
-				ParseMP3: mp3Check.IsChecked(),
-				Verbose: verboseCheck.IsChecked(),
-				Debug: debugCheck.IsChecked(),
-				SkipLrc: SkipLrcCheck.IsChecked(),
-				SkipTxt: SkipTxtCheck.IsChecked(),
-			}
-
-			if err := cfg.VerifyConfig(); err != nil {
-				onError(err.Error())
-				return
-			}
-
-			onRun(cfg)
-		})
+		AddButton("Run (Ctrl + Enter)", run_func)
 
 	form.SetBorder(true).
 		SetTitle("Config").
@@ -107,6 +109,14 @@ func MakeMainForm(onBrowse func(), onRun func(arguments.Config), onError func(st
 	form.SetFieldBackgroundColor(tcell.ColorWhite).
 		SetFieldTextColor(tcell.ColorBlack).
 		SetBackgroundColor(tcell.ColorBlack)
+
+	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Modifiers()&tcell.ModCtrl!= 0 && event.Key() == tcell.KeyEnter {
+			run_func()
+		}
+
+		return event
+	})
 
 	return form
 }
