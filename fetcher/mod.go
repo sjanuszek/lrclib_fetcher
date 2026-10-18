@@ -6,7 +6,7 @@ import (
 )
 
 const APIBase = "https://lrclib.net/api/"
-const Header = "lrclib_fetcher/0.1 (https://github.com/sjanuszek/lrclib_fetcher)"
+const Header = "Lrclib-App-Id: IZwgt-FNqWDOUdmkxNrwqg2oZFLPK2z588JTxc_6Ybk"
 
 type Statistics struct {
 	filesCounter, skippedCounter, processedCounter, notFoundCounter, syncedCounter, plainCounter, failedCounter atomic.Int64
