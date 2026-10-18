@@ -97,7 +97,8 @@ func RunTUI() {
 					item := unresolved[index]
 					pageName := fmt.Sprintf("review-%d", index)
 
-					reviewPanel := components.MakeReviewPanelFlex(item.Candidates, index, len(unresolved), func(lyrics, ext string) {
+					curr_track := item.Data.TrackName + " - " + item.Data.AlbumName + " - " + item.Data.ArtistName
+					reviewPanel := components.MakeReviewPanelFlex(item.Candidates, curr_track, index, len(unresolved), func(lyrics, ext string) {
 						cache.AddToResolved(item.Data.FilePath, lyrics, ext)
 						pages.RemovePage(pageName)
 						advanceReview(index + 1)

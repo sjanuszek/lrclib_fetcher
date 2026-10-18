@@ -18,7 +18,7 @@ func getShortcutRune(index int) rune {
 	return 0
 }
 
-func MakeReviewPanelFlex(responses []fetcher.SearchResponse, curr, total int, onSelect func(lyrics, ext string), onSkip func()) *tview.Flex {
+func MakeReviewPanelFlex(responses []fetcher.SearchResponse, currTrack string, curr, total int, onSelect func(lyrics, ext string), onSkip func()) *tview.Flex {
 	var list *tview.List
 	var text *tview.TextView
 	var flex *tview.Flex
@@ -30,6 +30,8 @@ func MakeReviewPanelFlex(responses []fetcher.SearchResponse, curr, total int, on
 	width := len(fmt.Sprintf("%d", total))
 	flex.SetBorder(true).
 		SetTitle(fmt.Sprintf("To review: %0*d/%0*d", width, curr, width, total))
+
+	curr_track_box := tview.NewTextView().SetText("Searching for: " + currTrack)
 
 	list = tview.NewList()
 	for i, resp := range responses {
@@ -92,9 +94,17 @@ func MakeReviewPanelFlex(responses []fetcher.SearchResponse, curr, total int, on
 		}
 
 		if synced {
-			onSelect(responses[index].SyncedLyrics, ".lrc")
+			if responses[index].SyncedLyrics == "" {
+				onSkip()
+			} else {
+				onSelect(responses[index].SyncedLyrics, ".lrc")
+			}
 		} else {
-			onSelect(responses[index].PlainLyrics, ".txt")
+			if responses[index].PlainLyrics == "" {
+				onSkip()
+			} else {
+				onSelect(responses[index].PlainLyrics, ".txt")
+			}
 		}
 	})
 
@@ -115,8 +125,13 @@ func MakeReviewPanelFlex(responses []fetcher.SearchResponse, curr, total int, on
 
 	updateText()
 
-	flex.AddItem(list, 0, 1, true).
-		AddItem(text, 0, 2, false)
+	left := tview.NewFlex().
+			 SetDirection(tview.FlexRow).
+			 AddItem(curr_track_box, 0, 1, false).
+			 AddItem(list, 0, 15, true)
+
+	flex.AddItem(left, 0, 1, true).
+		   AddItem(text, 0, 2, false)
 
 	return flex
 }
