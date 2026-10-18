@@ -190,6 +190,10 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache
 					continue
 				}
 
+				params = url.Values{}
+				q := task.TrackName + " " + task.ArtistName
+				params.Add("q", q)
+
 				respSearch, errSearch := fetcher.trySearch(params, formattingData)
 
 				if errSearch == nil && len(respSearch) > 0 {
