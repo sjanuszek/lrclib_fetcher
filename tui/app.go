@@ -101,6 +101,8 @@ func RunTUI() {
 						cache.AddToResolved(item.Data.FilePath, lyrics, ext)
 						pages.RemovePage(pageName)
 						advanceReview(index + 1)
+					}, func() {
+						advanceReview(index + 1)
 					})
 
 					reviewFlex := tview.NewFlex().
@@ -144,7 +146,7 @@ func RunTUI() {
 	})
 
 	reviewFooterFLex = tview.NewFlex().
-		AddItem(components.MakeFooterView("[TAB] - Cycle between lyric types, [ENTER] - Select lyrics"), 0, 1, false)
+		AddItem(components.MakeFooterView("[TAB] - Cycle between lyric types, [ENTER] - Select lyrics, [ESC] - Skip item"), 0, 1, false)
 
 	treeFooterFlex = tview.NewFlex().
 		AddItem(components.MakeFooterView("[TAB] - Move up directory, [SHIFT + CTRL] - Enter directory, [ENTER] - Select directory"), 0, 1, false)

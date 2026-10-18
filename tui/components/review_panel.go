@@ -18,7 +18,7 @@ func getShortcutRune(index int) rune {
 	return 0
 }
 
-func MakeReviewPanelFlex(responses []fetcher.SearchResponse, curr, total int, onSelect func(lyrics, ext string)) *tview.Flex {
+func MakeReviewPanelFlex(responses []fetcher.SearchResponse, curr, total int, onSelect func(lyrics, ext string), onSkip func()) *tview.Flex {
 	var list *tview.List
 	var text *tview.TextView
 	var flex *tview.Flex
@@ -103,6 +103,9 @@ func MakeReviewPanelFlex(responses []fetcher.SearchResponse, curr, total int, on
 			synced = !synced
 			updateText()
 			return nil
+		}
+		if event.Key() == tcell.KeyEsc {
+			onSkip()
 		}
 		return event
 	})
