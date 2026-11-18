@@ -42,21 +42,13 @@ func GetTasks(files []string, stats *Statistics, jobs int, SkipLrc, SkipTxt bool
 					continue
 				}
 
-				file, err := os.Open(file_name)
-				if err != nil {
-					logger.Always("[%0*d/%0*d] Failed to open: %s", width, curr, width, total, file_name)
-					continue
-				}
-
-				if m, ok := metadata.GetTags(file); ok {
+				if m, ok := metadata.GetTags(file_name); ok {
 					logger.Verbose("[%0*d/%0*d] Getting metadata: %s", width, curr, width, total, file_name)
 					stats.processedCounter.Add(1)
 					mu.Lock()
 					tasks = append(tasks, m)
 					mu.Unlock()
 				}
-
-				file.Close()
 			}
 		})
 	}
