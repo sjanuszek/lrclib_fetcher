@@ -23,10 +23,6 @@ func MakeMainForm(onBrowse func(), onRun func(arguments.Config), onError func(st
 	debugCheck := tview.NewCheckbox().
 		SetLabel("Enable debug output")
 
-	mp3Check := tview.NewCheckbox().
-		SetLabel("Include mp3 in file search").
-		SetChecked(true)
-
 	SkipLrcCheck := tview.NewCheckbox().
 		SetLabel("Skip files with existing .lrc files").
 		SetChecked(true)
@@ -75,7 +71,6 @@ func MakeMainForm(onBrowse func(), onRun func(arguments.Config), onError func(st
 			Jobs: parseInt(jobsInput.GetText()),
 			FetchJobs: parseInt(fetchJobsInput.GetText()),
 			MaxRetries: parseInt(maxRetriesInput.GetText()),
-			ParseMP3: mp3Check.IsChecked(),
 			Verbose: verboseCheck.IsChecked(),
 			Debug: debugCheck.IsChecked(),
 			SkipLrc: SkipLrcCheck.IsChecked(),
@@ -95,7 +90,6 @@ func MakeMainForm(onBrowse func(), onRun func(arguments.Config), onError func(st
 		AddFormItem(fetchJobsInput).
 		AddFormItem(jobsInput).
 		AddFormItem(maxRetriesInput).
-		AddFormItem(mp3Check).
 		AddFormItem(SkipLrcCheck).
 		AddFormItem(SkipTxtCheck).
 		AddFormItem(verboseCheck).

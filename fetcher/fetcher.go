@@ -238,17 +238,15 @@ func (fetcher *Fetcher) fetchLyrics(tasks []metadata.NecessaryData) *LyricsCache
 }
 
 func (fetcher *Fetcher) GetLyrics(config arguments.Config) *LyricsCache {
-	files, err := util.Glob(config.InputPath, ".flac")
-	if err != nil {
-		panic("FAILED TO GLOB FLAC")
-	}
+	exts := []string{ ".mp3", ".mp4", ".aac", ".ogg", ".opus", ".flac", ".spx", ".ape", ".mpc", ".wv", ".wav", ".aiff", ".mka", ".webm", ".asf", ".wma", ".dfs", ".dff" }
+	files := []string{}
 
-	if config.ParseMP3 {
-		mp3, err := util.Glob(config.InputPath, ".mp3")
+	for _, ext := range exts {
+		files_glob, err := util.Glob(config.InputPath, ext)
 		if err != nil {
-			panic("FAILED TO GLOB MP3")
+			panic(fmt.Errorf("FAILTED TO GLOB %s", ext))
 		}
-		files = append(files, mp3...)
+		files = append(files, files_glob...)
 	}
 
 	tasks := GetTasks(files, fetcher.stats, config.Jobs, config.SkipLrc, config.SkipTxt, fetcher.logger)

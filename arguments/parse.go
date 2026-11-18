@@ -17,8 +17,6 @@ func GetConfig() Config {
 
 	pflag.IntVarP(&maxRetriesPtr, "max-retries", "r", 3, "max retries")
 
-	pflag.BoolVarP(&mp3Ptr, "mp3", "m", false, "include mp3")
-
 	pflag.BoolVarP(&verbosePtr, "verbose", "v", false, "verbose")
 
 	pflag.BoolVarP(&debugPtr, "debug", "d", false, "debug")
@@ -34,7 +32,6 @@ func GetConfig() Config {
 		jobsPtr,
 		fetchJobsPtr,
 		maxRetriesPtr,
-		mp3Ptr,
 		verbosePtr,
 		debugPtr,
 		SkipLrcPtr,

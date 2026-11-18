@@ -11,7 +11,6 @@ type Config struct {
 	Jobs int
 	FetchJobs int
 	MaxRetries int
-	ParseMP3 bool
 	Verbose bool
 	Debug bool
 	SkipLrc bool
