@@ -11,6 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"math/rand/v2"
 
 	"lrclib_fetcher/arguments"
 	"lrclib_fetcher/metadata"
@@ -42,11 +43,15 @@ func NewFetcher(stats *Statistics, lyricJobs, maxRetries int, logger *util.Logge
 }
 
 func parseRetryAfter(header string) time.Duration {
+	base := 2 * time.Second
 	if sec, err := strconv.Atoi(header); err == nil && sec > 0 {
-		return time.Duration(sec) * time.Second
+		base = time.Duration(sec) * time.Second
 	}
 
-	return 2 * time.Second 
+	jitterMax := max(250*time.Millisecond, base/5)
+	jitter := time.Duration(rand.Int64N(int64(jitterMax)))
+
+	return base + jitter
 }
 
 func doAPIRequest[T any](fetcher *Fetcher, endpoint string, params url.Values, formattingData FormattingData) (T, error) {
